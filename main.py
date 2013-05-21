@@ -10,6 +10,7 @@
 
 from scapy.all import *
 from sys import argv
+from math import log 
 import matplotlib.pyplot as plt
 
 def plot_hist(di, name, xtag, ytag, figid ):
@@ -89,20 +90,58 @@ if __name__ == "__main__":
     pcap = rdpcap(filename)
     arp_wh = pcap.filter(lambda x : x.haslayer(ARP) and x[ARP].op == 1 )
 
-    d = {}
-    for i in arp_wh:
-        d[i.psrc] = d.get(i.psrc, 0) + 1
+# 
+#     d = {}
+#     for i in arp_wh:
+#         d[i.psrc] = d.get(i.psrc, 0) + 1
+# 
+#     print d
+#     plot_hist(d, "IPs que mas piden", "IPs", "# Who-has", 0)
+# 
+#     d = {}
+#     for i in arp_wh:
+#         d[i.pdst] = d.get(i.pdst, 0) + 1
+#     plot_hist(d, "IPs mas pedidas", "IPs", "# Who-has", 1)
 
-    print d
-    plot_hist(d, "IPs que mas piden", "IPs", "# Who-has", 0)
 
-    d = {}
+    ## Entropy for each IP: 
+    # { ip1 : [(ip2, freq), (ip3, freq)...] }
+    # {ip1: {ip2: 3, ip3: 4, } }
+
+    freqs = {}
     for i in arp_wh:
+        ## Obtengo lo del paso anterior o el default:
+        d, tot = freqs.get(i.psrc, ({},0))
         d[i.pdst] = d.get(i.pdst, 0) + 1
-    plot_hist(d, "IPs mas pedidas", "IPs", "# Who-has", 1)
+
+        tot = tot + 1
+        freqs[i.psrc] = (d, tot)
+
+    for k, v in freqs.items():
+        for kk, vv in v[0].items():
+            v[0][kk] = float(vv / float(v[1]))
+        
+    # print freqs
+
+    sources_entropy = {}
+    for src, (freqs, tot) in freqs.items():
+        sources_entropy[src] =  sum( [ pi * (-1 *log(pi))  for pi in freqs.values()] )
+
+    se = {}
+    for k, v in sources_entropy.items():
+        if v ==0:
+            se[k] = v
+
+    plot_hist(se, "Entropy", "Source", "H(S)", 0)
 
 
-    arp_wh = pcap.filter(lambda x : x.haslayer(ARP) and x[ARP].op == 1 )
-    relations = get_rep_graph(arp_wh)
+    ## Calculo la cantidad de destinos totales
+    ## Para cada uno cuento la frecuencia relativa
+    ## Armo una matriz de {ip.orig: {ip2: freq, ip3:freq}}
 
-    plot_graph(relations, "comunicaciones.png")
+
+
+    # arp_wh = pcap.filter(lambda x : x.haslayer(ARP) and x[ARP].op == 1 )
+    # relations = get_rep_graph(arp_wh)
+
+    # plot_graph(relations, "comunicaciones.png")
